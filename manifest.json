@@ -1,9 +1,9 @@
 {
   "id": "multiline-tabs-wheel-scroll",
   "name": "Multiline Tabs Wheel Scroll",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.0.0",
   "description": "Smooth wheel scrolling and drag-and-drop reordering for wrapped editor tabs, including cross-window moves.",
-  "author": "lxa",
+  "author": "ltz6",
   "isDesktopOnly": true
 }
