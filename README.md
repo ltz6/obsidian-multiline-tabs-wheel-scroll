@@ -10,6 +10,7 @@ An Obsidian desktop plugin for wrapped editor tabs.
 - Drag tabs between separate Obsidian windows and attach them to the target tab group.
 - Scroll or use edge auto-scroll while dragging to locate the target position.
 - Keeps native tab controls and the right sidebar toggle usable.
+- Settings for the visible tab-row count and tab width.
 
 The multiline tab layout is built into the plugin. The separate `multiline-tabs-autofit.css` snippet is not required.
 
@@ -20,6 +21,9 @@ Install it from Obsidian Community Plugins after it is approved. For manual inst
 `.obsidian/plugins/multiline-tabs-wheel-scroll/`
 
 Then enable **Multiline Tabs Wheel Scroll** in Obsidian's community plugins settings.
+
+After enabling the plugin, open its settings to change the visible tab rows and
+the width of each regular tab. The defaults are three rows and 124 px.
 
 ## Compatibility
 

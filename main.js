@@ -1,12 +1,20 @@
 "use strict";
 
-const { Plugin } = require("obsidian");
+const { Plugin, PluginSettingTab, Setting } = require("obsidian");
 const fs = require("fs");
 const path = require("path");
 
 const TAB_CONTAINER_SELECTOR =
   ".workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner";
 const TAB_DRAG_MIME = "application/x-obsidian-multiline-tab";
+const DEFAULT_SETTINGS = Object.freeze({
+  visibleRows: 3,
+  tabWidth: 124,
+});
+const SETTINGS_LIMITS = Object.freeze({
+  visibleRows: { min: 1, max: 12, step: 1 },
+  tabWidth: { min: 80, max: 320, step: 4 },
+});
 const AUTOFIT_STYLE_TEXT = String.raw`
 /*
  * Stable multiline editor tabs for Obsidian.
@@ -20,6 +28,7 @@ body {
   --multiline-tabs-max-width: 176px;
   --multiline-tabs-single-min-width: 160px;
   --multiline-tabs-single-max-width: 280px;
+  --multiline-tabs-tab-width: 124px;
   --multiline-tabs-row-height: 30px;
   --multiline-tabs-row-gap: 2px;
   --multiline-tabs-visible-rows: 3;
@@ -75,10 +84,10 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header.autofit-tab,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header {
   container-type: normal;
-  flex: 1 1 var(--multiline-tabs-ideal-width) !important;
-  width: auto !important;
-  min-width: var(--multiline-tabs-min-width) !important;
-  max-width: var(--multiline-tabs-max-width) !important;
+  flex: 0 0 var(--multiline-tabs-tab-width) !important;
+  width: var(--multiline-tabs-tab-width) !important;
+  min-width: var(--multiline-tabs-tab-width) !important;
+  max-width: var(--multiline-tabs-tab-width) !important;
   height: var(--multiline-tabs-row-height);
   contain: none !important;
   transition: none !important;
@@ -88,6 +97,7 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header:first-child:last-child,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header:first-child:last-child {
   flex: 0 1 auto !important;
+  width: auto !important;
   min-width: var(--multiline-tabs-single-min-width) !important;
   max-width: var(--multiline-tabs-single-max-width) !important;
 }
@@ -212,8 +222,57 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 }
 `;
 
+class MultilineTabsWheelScrollSettingTab extends PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "Multiline Tabs Wheel Scroll" });
+
+    new Setting(containerEl)
+      .setName("Visible tab rows")
+      .setDesc("Choose how many tab rows remain visible before scrolling is needed.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.visibleRows.min,
+            SETTINGS_LIMITS.visibleRows.max,
+            SETTINGS_LIMITS.visibleRows.step,
+          )
+          .setValue(this.plugin.settings.visibleRows)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ visibleRows: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Tab width")
+      .setDesc("Set the width of regular tabs in pixels. Single-tab groups keep their compact layout.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.tabWidth.min,
+            SETTINGS_LIMITS.tabWidth.max,
+            SETTINGS_LIMITS.tabWidth.step,
+          )
+          .setValue(this.plugin.settings.tabWidth)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ tabWidth: value });
+          }),
+      );
+  }
+}
+
 module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
   async onload() {
+    const savedSettings = await this.loadData();
+    this.settings = this.normalizeSettings(savedSettings);
     this.sidebarClickCount = 0;
     const vaultBasePath = this.app.vault.adapter?.basePath || "";
     const windowLabel = document.body.classList.contains("is-popout-window")
@@ -287,6 +346,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     this.register(() => {
       window.removeEventListener("storage", this.boundStorageMessage);
     });
+    this.addSettingTab(new MultilineTabsWheelScrollSettingTab(this.app, this));
     this.bindTabWindow(window);
 
     this.registerEvent(this.app.workspace.on("layout-change", () => this.queueRefresh()));
@@ -310,6 +370,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     this.handleNativeTabDragEnd();
     for (const { doc } of this.windowBindings.values()) {
       this.detachBindings(doc);
+      this.clearSettingsFromDocument(doc);
     }
     this.detachTabDragHandlers();
     this.stopWheelAnimations();
@@ -322,6 +383,68 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       cancelAnimationFrame(this.refreshFrame);
       this.refreshFrame = null;
     }
+  }
+
+  normalizeSettings(savedSettings) {
+    const source = savedSettings && typeof savedSettings === "object" ? savedSettings : {};
+    return {
+      visibleRows: this.clampSetting(
+        source.visibleRows,
+        SETTINGS_LIMITS.visibleRows,
+        DEFAULT_SETTINGS.visibleRows,
+      ),
+      tabWidth: this.clampSetting(
+        source.tabWidth,
+        SETTINGS_LIMITS.tabWidth,
+        DEFAULT_SETTINGS.tabWidth,
+      ),
+    };
+  }
+
+  clampSetting(value, limits, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return fallback;
+    }
+
+    const stepped = Math.round(number / limits.step) * limits.step;
+    return Math.min(limits.max, Math.max(limits.min, stepped));
+  }
+
+  async updateSettings(changes) {
+    this.settings = this.normalizeSettings({
+      ...this.settings,
+      ...changes,
+    });
+    await this.saveData(this.settings);
+    this.applySettingsToAllDocuments();
+    this.queueRefresh();
+  }
+
+  applySettingsToAllDocuments() {
+    for (const { doc } of this.windowBindings.values()) {
+      this.applySettingsToDocument(doc);
+    }
+  }
+
+  applySettingsToDocument(doc) {
+    if (!doc?.body) {
+      return;
+    }
+
+    doc.body.style.setProperty(
+      "--multiline-tabs-visible-rows",
+      String(this.settings.visibleRows),
+    );
+    doc.body.style.setProperty(
+      "--multiline-tabs-tab-width",
+      `${this.settings.tabWidth}px`,
+    );
+  }
+
+  clearSettingsFromDocument(doc) {
+    doc?.body?.style.removeProperty("--multiline-tabs-visible-rows");
+    doc?.body?.style.removeProperty("--multiline-tabs-tab-width");
   }
 
   queueRefresh() {
@@ -396,6 +519,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       observer,
       dropIndicatorStyle: this.createDropIndicatorStyle(doc),
     });
+    this.applySettingsToDocument(doc);
   }
 
   unbindTabWindow(win) {
