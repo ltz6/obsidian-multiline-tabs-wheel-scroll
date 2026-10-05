@@ -9,7 +9,9 @@ const TAB_CONTAINER_SELECTOR =
 const TAB_DRAG_MIME = "application/x-obsidian-multiline-tab";
 const DEFAULT_SETTINGS = Object.freeze({
   visibleRows: 3,
-  tabWidth: 124,
+  minTabWidth: 84,
+  maxTabWidth: 176,
+  idealTabWidth: 124,
   rowHeight: 30,
   rowGap: 2,
   wheelSpeed: 1,
@@ -20,7 +22,9 @@ const DEFAULT_SETTINGS = Object.freeze({
 });
 const SETTINGS_LIMITS = Object.freeze({
   visibleRows: { min: 1, max: 12, step: 1 },
-  tabWidth: { min: 80, max: 320, step: 4 },
+  minTabWidth: { min: 60, max: 320, step: 4 },
+  maxTabWidth: { min: 60, max: 320, step: 4 },
+  idealTabWidth: { min: 60, max: 320, step: 4 },
   rowHeight: { min: 22, max: 48, step: 1 },
   rowGap: { min: 0, max: 12, step: 1 },
   wheelSpeed: { min: 0.25, max: 3, step: 0.25 },
@@ -37,8 +41,8 @@ const AUTOFIT_STYLE_TEXT = String.raw`
  */
 
 body {
-  --multiline-tabs-min-width: 84px;
   --multiline-tabs-ideal-width: 124px;
+  --multiline-tabs-min-width: 84px;
   --multiline-tabs-max-width: 176px;
   --multiline-tabs-single-min-width: 160px;
   --multiline-tabs-single-max-width: 280px;
@@ -84,7 +88,7 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
   overflow-x: hidden !important;
   overflow-y: scroll !important;
   overscroll-behavior-y: contain;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   scrollbar-width: auto;
   scrollbar-color: var(--scrollbar-thumb-bg) var(--background-secondary);
   box-sizing: border-box;
@@ -99,10 +103,18 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header.autofit-tab,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner > .workspace-tab-header {
   container-type: normal;
-  flex: 0 0 var(--multiline-tabs-tab-width) !important;
-  width: var(--multiline-tabs-tab-width) !important;
-  min-width: var(--multiline-tabs-tab-width) !important;
-  max-width: var(--multiline-tabs-tab-width) !important;
+  flex: 1 1 clamp(
+    var(--multiline-tabs-min-width),
+    var(--multiline-tabs-ideal-width),
+    var(--multiline-tabs-max-width)
+  ) !important;
+  width: clamp(
+    var(--multiline-tabs-min-width),
+    var(--multiline-tabs-ideal-width),
+    var(--multiline-tabs-max-width)
+  ) !important;
+  min-width: var(--multiline-tabs-min-width) !important;
+  max-width: var(--multiline-tabs-max-width) !important;
   height: var(--multiline-tabs-row-height);
   contain: none !important;
   transition: none !important;
@@ -248,158 +260,117 @@ class MultilineTabsWheelScrollSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "Multiline Tabs Wheel Scroll" });
 
-    new Setting(containerEl)
-      .setName("Visible tab rows")
-      .setDesc("Choose how many tab rows remain visible before scrolling is needed.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.visibleRows.min,
-            SETTINGS_LIMITS.visibleRows.max,
-            SETTINGS_LIMITS.visibleRows.step,
-          )
-          .setValue(this.plugin.settings.visibleRows)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ visibleRows: value });
-          }),
-      );
+    new Setting(containerEl).setName("Restore all settings").addButton((button) =>
+      button
+        .setButtonText("全部还原")
+        .setTooltip("Restore every setting to its default value")
+        .onClick(async () => {
+          await this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
+          this.display();
+        }),
+    );
 
-    new Setting(containerEl)
-      .setName("Tab width")
-      .setDesc("Set the width of regular tabs in pixels. Single-tab groups keep their compact layout.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.tabWidth.min,
-            SETTINGS_LIMITS.tabWidth.max,
-            SETTINGS_LIMITS.tabWidth.step,
-          )
-          .setValue(this.plugin.settings.tabWidth)
+    const addSliderSetting = (
+      name,
+      description,
+      key,
+      onChange,
+      onSliderReady,
+    ) => {
+      const limits = SETTINGS_LIMITS[key];
+      const setting = new Setting(containerEl).setName(name).setDesc(description);
+      setting.addSlider((slider) => {
+        onSliderReady?.(slider);
+        return slider
+          .setLimits(limits.min, limits.max, limits.step)
+          .setValue(this.plugin.settings[key])
           .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ tabWidth: value });
+          .onChange(
+            onChange ??
+              (async (value) => {
+                await this.plugin.updateSettings({ [key]: value });
+              }),
+          );
+      });
+      setting.addButton((button) =>
+        button
+          .setButtonText("还原")
+          .setTooltip("Restore this setting to its default value")
+          .onClick(async () => {
+            await this.plugin.updateSettings({ [key]: DEFAULT_SETTINGS[key] });
+            this.display();
           }),
       );
+      return setting;
+    };
 
-    new Setting(containerEl)
-      .setName("Tab row height")
-      .setDesc("Set the height of each tab row in pixels.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.rowHeight.min,
-            SETTINGS_LIMITS.rowHeight.max,
-            SETTINGS_LIMITS.rowHeight.step,
-          )
-          .setValue(this.plugin.settings.rowHeight)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ rowHeight: value });
-          }),
-      );
+    addSliderSetting(
+      "Visible tab rows",
+      "Choose how many tab rows remain visible before scrolling is needed.",
+      "visibleRows",
+    );
 
-    new Setting(containerEl)
-      .setName("Row gap")
-      .setDesc("Set the vertical gap between tab rows in pixels.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.rowGap.min,
-            SETTINGS_LIMITS.rowGap.max,
-            SETTINGS_LIMITS.rowGap.step,
-          )
-          .setValue(this.plugin.settings.rowGap)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ rowGap: value });
-          }),
-      );
+    let minWidthSlider;
+    let maxWidthSlider;
+    addSliderSetting(
+      "Minimum tab width",
+      "Set the narrowest regular tab width in pixels.",
+      "minTabWidth",
+      async (value) => {
+        const maxTabWidth = Math.max(value, this.plugin.settings.maxTabWidth);
+        await this.plugin.updateSettings({ minTabWidth: value, maxTabWidth });
+        maxWidthSlider?.setValue(maxTabWidth);
+      },
+      (slider) => {
+        minWidthSlider = slider;
+      },
+    );
 
-    new Setting(containerEl)
-      .setName("Wheel scroll speed")
-      .setDesc("Adjust the amount moved by each mouse-wheel step.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.wheelSpeed.min,
-            SETTINGS_LIMITS.wheelSpeed.max,
-            SETTINGS_LIMITS.wheelSpeed.step,
-          )
-          .setValue(this.plugin.settings.wheelSpeed)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ wheelSpeed: value });
-          }),
-      );
+    addSliderSetting(
+      "Maximum tab width",
+      "Set the widest regular tab width in pixels. Tabs expand to fill each row when space allows.",
+      "maxTabWidth",
+      async (value) => {
+        const minTabWidth = Math.min(value, this.plugin.settings.minTabWidth);
+        await this.plugin.updateSettings({ minTabWidth, maxTabWidth: value });
+        minWidthSlider?.setValue(minTabWidth);
+      },
+      (slider) => {
+        maxWidthSlider = slider;
+      },
+    );
 
-    new Setting(containerEl)
-      .setName("Wheel smoothness")
-      .setDesc("Set the response time of smooth scrolling. Higher values feel softer and slower.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.wheelSmoothness.min,
-            SETTINGS_LIMITS.wheelSmoothness.max,
-            SETTINGS_LIMITS.wheelSmoothness.step,
-          )
-          .setValue(this.plugin.settings.wheelSmoothness)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ wheelSmoothness: value });
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Drag edge scroll speed")
-      .setDesc("Set the maximum automatic scroll speed when dragging near the top or bottom edge.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.edgeScrollSpeed.min,
-            SETTINGS_LIMITS.edgeScrollSpeed.max,
-            SETTINGS_LIMITS.edgeScrollSpeed.step,
-          )
-          .setValue(this.plugin.settings.edgeScrollSpeed)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ edgeScrollSpeed: value });
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Drag edge trigger area")
-      .setDesc("Set how much of the top and bottom edge activates automatic scrolling.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.edgeScrollThreshold.min,
-            SETTINGS_LIMITS.edgeScrollThreshold.max,
-            SETTINGS_LIMITS.edgeScrollThreshold.step,
-          )
-          .setValue(this.plugin.settings.edgeScrollThreshold)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ edgeScrollThreshold: value });
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Scrollbar width")
-      .setDesc("Set the width of the tab-area scrollbar in pixels.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(
-            SETTINGS_LIMITS.scrollbarWidth.min,
-            SETTINGS_LIMITS.scrollbarWidth.max,
-            SETTINGS_LIMITS.scrollbarWidth.step,
-          )
-          .setValue(this.plugin.settings.scrollbarWidth)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            await this.plugin.updateSettings({ scrollbarWidth: value });
-          }),
-      );
+    addSliderSetting(
+      "Tab row height",
+      "Set the height of each tab row in pixels.",
+      "rowHeight",
+    );
+    addSliderSetting("Row gap", "Set the vertical gap between tab rows in pixels.", "rowGap");
+    addSliderSetting(
+      "Wheel scroll speed",
+      "Adjust the amount moved by each mouse-wheel step.",
+      "wheelSpeed",
+    );
+    addSliderSetting(
+      "Wheel smoothness",
+      "Set the response time of smooth scrolling. Higher values feel softer and slower.",
+      "wheelSmoothness",
+    );
+    addSliderSetting(
+      "Drag edge scroll speed",
+      "Set the maximum automatic scroll speed when dragging near the top or bottom edge.",
+      "edgeScrollSpeed",
+    );
+    addSliderSetting(
+      "Drag edge trigger area",
+      "Set how much of the top and bottom edge activates automatic scrolling.",
+      "edgeScrollThreshold",
+    );
+    addSliderSetting(
+      "Scrollbar width",
+      "Set the width of the tab-area scrollbar in pixels.",
+      "scrollbarWidth",
+    );
   }
 }
 
@@ -521,17 +492,38 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
 
   normalizeSettings(savedSettings) {
     const source = savedSettings && typeof savedSettings === "object" ? savedSettings : {};
+    const hasLegacyTabWidth = Number.isFinite(Number(source.tabWidth));
+    const idealTabWidth = this.clampSetting(
+      source.idealTabWidth ?? source.tabWidth,
+      SETTINGS_LIMITS.idealTabWidth,
+      DEFAULT_SETTINGS.idealTabWidth,
+    );
+    const minTabWidth = this.clampSetting(
+      source.minTabWidth,
+      SETTINGS_LIMITS.minTabWidth,
+      hasLegacyTabWidth
+        ? Math.min(DEFAULT_SETTINGS.minTabWidth, idealTabWidth)
+        : DEFAULT_SETTINGS.minTabWidth,
+    );
+    const maxTabWidth = Math.max(
+      minTabWidth,
+      this.clampSetting(
+        source.maxTabWidth,
+        SETTINGS_LIMITS.maxTabWidth,
+        hasLegacyTabWidth
+          ? Math.max(DEFAULT_SETTINGS.maxTabWidth, idealTabWidth)
+          : DEFAULT_SETTINGS.maxTabWidth,
+      ),
+    );
     return {
       visibleRows: this.clampSetting(
         source.visibleRows,
         SETTINGS_LIMITS.visibleRows,
         DEFAULT_SETTINGS.visibleRows,
       ),
-      tabWidth: this.clampSetting(
-        source.tabWidth,
-        SETTINGS_LIMITS.tabWidth,
-        DEFAULT_SETTINGS.tabWidth,
-      ),
+      minTabWidth,
+      maxTabWidth,
+      idealTabWidth,
       rowHeight: this.clampSetting(
         source.rowHeight,
         SETTINGS_LIMITS.rowHeight,
@@ -581,10 +573,22 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
   }
 
   async updateSettings(changes) {
-    this.settings = this.normalizeSettings({
+    const nextSettings = {
       ...this.settings,
       ...changes,
-    });
+    };
+    if ("minTabWidth" in changes && !("maxTabWidth" in changes)) {
+      nextSettings.maxTabWidth = Math.max(
+        nextSettings.minTabWidth,
+        nextSettings.maxTabWidth,
+      );
+    } else if ("maxTabWidth" in changes && !("minTabWidth" in changes)) {
+      nextSettings.minTabWidth = Math.min(
+        nextSettings.minTabWidth,
+        nextSettings.maxTabWidth,
+      );
+    }
+    this.settings = this.normalizeSettings(nextSettings);
     await this.saveData(this.settings);
     this.applySettingsToAllDocuments();
     this.queueRefresh();
@@ -606,8 +610,20 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       String(this.settings.visibleRows),
     );
     doc.body.style.setProperty(
+      "--multiline-tabs-min-width",
+      `${this.settings.minTabWidth}px`,
+    );
+    doc.body.style.setProperty(
+      "--multiline-tabs-max-width",
+      `${this.settings.maxTabWidth}px`,
+    );
+    doc.body.style.setProperty(
+      "--multiline-tabs-ideal-width",
+      `${this.settings.idealTabWidth}px`,
+    );
+    doc.body.style.setProperty(
       "--multiline-tabs-tab-width",
-      `${this.settings.tabWidth}px`,
+      `${this.settings.idealTabWidth}px`,
     );
     doc.body.style.setProperty(
       "--multiline-tabs-row-height",
@@ -625,6 +641,9 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
 
   clearSettingsFromDocument(doc) {
     doc?.body?.style.removeProperty("--multiline-tabs-visible-rows");
+    doc?.body?.style.removeProperty("--multiline-tabs-min-width");
+    doc?.body?.style.removeProperty("--multiline-tabs-max-width");
+    doc?.body?.style.removeProperty("--multiline-tabs-ideal-width");
     doc?.body?.style.removeProperty("--multiline-tabs-tab-width");
     doc?.body?.style.removeProperty("--multiline-tabs-row-height");
     doc?.body?.style.removeProperty("--multiline-tabs-row-gap");

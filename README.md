@@ -10,7 +10,10 @@ An Obsidian desktop plugin for wrapped editor tabs.
 - Drag tabs between separate Obsidian windows and attach them to the target tab group.
 - Scroll or use edge auto-scroll while dragging to locate the target position.
 - Keeps native tab controls and the right sidebar toggle usable.
-- Settings for tab rows, tab width, row spacing, wheel scrolling, drag edge scrolling, and scrollbar width.
+- Adjustable minimum and maximum tab widths, with rows expanding to use available space.
+- Individual setting restore buttons and a one-click restore-all action.
+- Settings for tab rows, row spacing, wheel scrolling, drag edge scrolling, and scrollbar width.
+- A native scrollbar that can be scrolled with the wheel or dragged directly with the mouse.
 
 The multiline tab layout is built into the plugin. The separate `multiline-tabs-autofit.css` snippet is not required.
 
@@ -24,9 +27,10 @@ Then enable **Multiline Tabs Wheel Scroll** in Obsidian's community plugins sett
 
 After enabling the plugin, open its settings to adjust the tab layout, wheel
 scrolling, drag edge scrolling, and scrollbar. The defaults preserve the
-original behavior: three rows, 124 px tab width, 30 px row height, 2 px row
-gap, 100% wheel speed, 55 ms smoothness, 360 px/s edge scrolling, 22% edge
-trigger area, and a 10 px scrollbar.
+original behavior: three rows, 84-176 px tab width (124 px preferred width),
+30 px row height, 2 px row gap, 100% wheel speed, 55 ms smoothness, 360 px/s
+edge scrolling, 22% edge trigger area, and a 10 px scrollbar. Use **Restore**
+to reset an individual value or **Restore all** to reset every setting.
 
 ## Compatibility
 
