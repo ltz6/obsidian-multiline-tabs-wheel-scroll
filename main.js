@@ -10,10 +10,24 @@ const TAB_DRAG_MIME = "application/x-obsidian-multiline-tab";
 const DEFAULT_SETTINGS = Object.freeze({
   visibleRows: 3,
   tabWidth: 124,
+  rowHeight: 30,
+  rowGap: 2,
+  wheelSpeed: 1,
+  wheelSmoothness: 55,
+  edgeScrollSpeed: 360,
+  edgeScrollThreshold: 22,
+  scrollbarWidth: 10,
 });
 const SETTINGS_LIMITS = Object.freeze({
   visibleRows: { min: 1, max: 12, step: 1 },
   tabWidth: { min: 80, max: 320, step: 4 },
+  rowHeight: { min: 22, max: 48, step: 1 },
+  rowGap: { min: 0, max: 12, step: 1 },
+  wheelSpeed: { min: 0.25, max: 3, step: 0.25 },
+  wheelSmoothness: { min: 20, max: 140, step: 5 },
+  edgeScrollSpeed: { min: 60, max: 1000, step: 20 },
+  edgeScrollThreshold: { min: 10, max: 40, step: 1 },
+  scrollbarWidth: { min: 4, max: 20, step: 1 },
 });
 const AUTOFIT_STYLE_TEXT = String.raw`
 /*
@@ -31,6 +45,7 @@ body {
   --multiline-tabs-tab-width: 124px;
   --multiline-tabs-row-height: 30px;
   --multiline-tabs-row-gap: 2px;
+  --multiline-tabs-scrollbar-width: 10px;
   --multiline-tabs-visible-rows: 3;
   --multiline-tabs-visible-height: calc(
     var(--multiline-tabs-visible-rows) * var(--multiline-tabs-row-height) +
@@ -205,7 +220,7 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar {
-  width: 10px;
+  width: var(--multiline-tabs-scrollbar-width);
 }
 
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar-thumb,
@@ -264,6 +279,125 @@ class MultilineTabsWheelScrollSettingTab extends PluginSettingTab {
           .setDynamicTooltip()
           .onChange(async (value) => {
             await this.plugin.updateSettings({ tabWidth: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Tab row height")
+      .setDesc("Set the height of each tab row in pixels.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.rowHeight.min,
+            SETTINGS_LIMITS.rowHeight.max,
+            SETTINGS_LIMITS.rowHeight.step,
+          )
+          .setValue(this.plugin.settings.rowHeight)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ rowHeight: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Row gap")
+      .setDesc("Set the vertical gap between tab rows in pixels.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.rowGap.min,
+            SETTINGS_LIMITS.rowGap.max,
+            SETTINGS_LIMITS.rowGap.step,
+          )
+          .setValue(this.plugin.settings.rowGap)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ rowGap: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Wheel scroll speed")
+      .setDesc("Adjust the amount moved by each mouse-wheel step.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.wheelSpeed.min,
+            SETTINGS_LIMITS.wheelSpeed.max,
+            SETTINGS_LIMITS.wheelSpeed.step,
+          )
+          .setValue(this.plugin.settings.wheelSpeed)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ wheelSpeed: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Wheel smoothness")
+      .setDesc("Set the response time of smooth scrolling. Higher values feel softer and slower.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.wheelSmoothness.min,
+            SETTINGS_LIMITS.wheelSmoothness.max,
+            SETTINGS_LIMITS.wheelSmoothness.step,
+          )
+          .setValue(this.plugin.settings.wheelSmoothness)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ wheelSmoothness: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Drag edge scroll speed")
+      .setDesc("Set the maximum automatic scroll speed when dragging near the top or bottom edge.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.edgeScrollSpeed.min,
+            SETTINGS_LIMITS.edgeScrollSpeed.max,
+            SETTINGS_LIMITS.edgeScrollSpeed.step,
+          )
+          .setValue(this.plugin.settings.edgeScrollSpeed)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ edgeScrollSpeed: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Drag edge trigger area")
+      .setDesc("Set how much of the top and bottom edge activates automatic scrolling.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.edgeScrollThreshold.min,
+            SETTINGS_LIMITS.edgeScrollThreshold.max,
+            SETTINGS_LIMITS.edgeScrollThreshold.step,
+          )
+          .setValue(this.plugin.settings.edgeScrollThreshold)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ edgeScrollThreshold: value });
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Scrollbar width")
+      .setDesc("Set the width of the tab-area scrollbar in pixels.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(
+            SETTINGS_LIMITS.scrollbarWidth.min,
+            SETTINGS_LIMITS.scrollbarWidth.max,
+            SETTINGS_LIMITS.scrollbarWidth.step,
+          )
+          .setValue(this.plugin.settings.scrollbarWidth)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.updateSettings({ scrollbarWidth: value });
           }),
       );
   }
@@ -398,6 +532,41 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
         SETTINGS_LIMITS.tabWidth,
         DEFAULT_SETTINGS.tabWidth,
       ),
+      rowHeight: this.clampSetting(
+        source.rowHeight,
+        SETTINGS_LIMITS.rowHeight,
+        DEFAULT_SETTINGS.rowHeight,
+      ),
+      rowGap: this.clampSetting(
+        source.rowGap,
+        SETTINGS_LIMITS.rowGap,
+        DEFAULT_SETTINGS.rowGap,
+      ),
+      wheelSpeed: this.clampSetting(
+        source.wheelSpeed,
+        SETTINGS_LIMITS.wheelSpeed,
+        DEFAULT_SETTINGS.wheelSpeed,
+      ),
+      wheelSmoothness: this.clampSetting(
+        source.wheelSmoothness,
+        SETTINGS_LIMITS.wheelSmoothness,
+        DEFAULT_SETTINGS.wheelSmoothness,
+      ),
+      edgeScrollSpeed: this.clampSetting(
+        source.edgeScrollSpeed,
+        SETTINGS_LIMITS.edgeScrollSpeed,
+        DEFAULT_SETTINGS.edgeScrollSpeed,
+      ),
+      edgeScrollThreshold: this.clampSetting(
+        source.edgeScrollThreshold,
+        SETTINGS_LIMITS.edgeScrollThreshold,
+        DEFAULT_SETTINGS.edgeScrollThreshold,
+      ),
+      scrollbarWidth: this.clampSetting(
+        source.scrollbarWidth,
+        SETTINGS_LIMITS.scrollbarWidth,
+        DEFAULT_SETTINGS.scrollbarWidth,
+      ),
     };
   }
 
@@ -440,11 +609,26 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       "--multiline-tabs-tab-width",
       `${this.settings.tabWidth}px`,
     );
+    doc.body.style.setProperty(
+      "--multiline-tabs-row-height",
+      `${this.settings.rowHeight}px`,
+    );
+    doc.body.style.setProperty(
+      "--multiline-tabs-row-gap",
+      `${this.settings.rowGap}px`,
+    );
+    doc.body.style.setProperty(
+      "--multiline-tabs-scrollbar-width",
+      `${this.settings.scrollbarWidth}px`,
+    );
   }
 
   clearSettingsFromDocument(doc) {
     doc?.body?.style.removeProperty("--multiline-tabs-visible-rows");
     doc?.body?.style.removeProperty("--multiline-tabs-tab-width");
+    doc?.body?.style.removeProperty("--multiline-tabs-row-height");
+    doc?.body?.style.removeProperty("--multiline-tabs-row-gap");
+    doc?.body?.style.removeProperty("--multiline-tabs-scrollbar-width");
   }
 
   queueRefresh() {
@@ -1467,7 +1651,10 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       return;
     }
 
-    const edgeSize = Math.min(48, Math.max(18, rect.height * 0.22));
+    const edgeSize = Math.min(
+      48,
+      Math.max(18, rect.height * (this.settings.edgeScrollThreshold / 100)),
+    );
     const distanceFromTop = clientY - rect.top;
     const distanceFromBottom = rect.bottom - clientY;
     let direction = 0;
@@ -1530,7 +1717,10 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
         Math.min(
           maxScrollTop,
           container.scrollTop +
-            state.direction * 360 * state.intensity * (elapsed / 1000),
+            state.direction *
+              this.settings.edgeScrollSpeed *
+              state.intensity *
+              (elapsed / 1000),
         ),
       );
       if (nextTop === container.scrollTop) {
@@ -1578,12 +1768,12 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     }
 
     if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-      return rawDelta * 24;
+      return rawDelta * 24 * this.settings.wheelSpeed;
     }
     if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-      return rawDelta * container.clientHeight;
+      return rawDelta * container.clientHeight * this.settings.wheelSpeed;
     }
-    return rawDelta;
+    return rawDelta * this.settings.wheelSpeed;
   }
 
   handleDragWheel(event) {
@@ -1658,7 +1848,8 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
         return;
       }
 
-      container.scrollTop += distance * (1 - Math.exp(-elapsed / 55));
+      container.scrollTop +=
+        distance * (1 - Math.exp(-elapsed / this.settings.wheelSmoothness));
       state.frame = state.requestFrame(tick);
     };
 
