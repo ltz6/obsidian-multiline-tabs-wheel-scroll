@@ -262,7 +262,7 @@ class MultilineTabsWheelScrollSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Restore all settings").addButton((button) =>
       button
-        .setButtonText("全部还原")
+        .setButtonText("Restore All")
         .setTooltip("Restore every setting to its default value")
         .onClick(async () => {
           await this.plugin.updateSettings({ ...DEFAULT_SETTINGS });
@@ -294,7 +294,7 @@ class MultilineTabsWheelScrollSettingTab extends PluginSettingTab {
       });
       setting.addButton((button) =>
         button
-          .setButtonText("还原")
+          .setButtonText("Restore")
           .setTooltip("Restore this setting to its default value")
           .onClick(async () => {
             await this.plugin.updateSettings({ [key]: DEFAULT_SETTINGS[key] });
