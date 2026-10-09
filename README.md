@@ -11,6 +11,7 @@ An Obsidian desktop plugin for wrapped editor tabs.
 - Scroll or use edge auto-scroll while dragging to locate the target position.
 - Keeps native tab controls and the right sidebar toggle usable.
 - Adjustable minimum and maximum tab widths, with rows expanding to use available space.
+- Drag the horizontal divider with the up/down handle to change the visible row count.
 - Individual setting restore buttons and a one-click restore-all action.
 - Settings for tab rows, row spacing, wheel scrolling, drag edge scrolling, and scrollbar width.
 - A native scrollbar that can be scrolled with the wheel or dragged directly with the mouse.

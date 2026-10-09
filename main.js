@@ -230,6 +230,81 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
   pointer-events: none;
 }
 
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle {
+  position: absolute !important;
+  left: 6px;
+  right: 6px;
+  bottom: -4px;
+  z-index: 20 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 8px;
+  padding: 0;
+  color: transparent;
+  font-size: 0;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: ns-resize;
+  user-select: none;
+  touch-action: none;
+  -webkit-app-region: no-drag !important;
+  opacity: 0.72;
+  transition: color 120ms ease, opacity 120ms ease, background-color 120ms ease;
+}
+
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::before,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::after,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::after {
+  content: "↕";
+  position: relative;
+  z-index: 1;
+  display: block;
+  min-width: 24px;
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 8px;
+  text-align: center;
+  background: var(--background-primary);
+}
+
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover,
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging {
+  color: var(--text-normal);
+  opacity: 1;
+}
+
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::before,
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::before,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::before,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::before {
+  border-top-color: var(--interactive-accent);
+}
+
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::after,
+.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::after,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::after,
+body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::after {
+  color: var(--text-normal);
+}
+
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar {
   width: var(--multiline-tabs-scrollbar-width);
@@ -401,6 +476,10 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     this.boundTabDrop = this.handleNativeTabDrop.bind(this);
     this.boundTabDragEnd = this.handleNativeTabDragEnd.bind(this);
     this.boundDragWheel = this.handleDragWheel.bind(this);
+    this.boundRowResizePointerDown = this.handleRowResizePointerDown.bind(this);
+    this.boundRowResizePointerMove = this.handleRowResizePointerMove.bind(this);
+    this.boundRowResizePointerUp = this.handleRowResizePointerUp.bind(this);
+    this.boundRowResizePointerCancel = this.handleRowResizePointerCancel.bind(this);
     this.boundRefresh = this.refreshBindings.bind(this);
     this.refreshFrame = null;
     this.refreshAfterDrag = false;
@@ -415,6 +494,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     this.suppressNativeDragEnd = false;
     this.dragEdgeScroll = null;
     this.wheelAnimations = new Map();
+    this.rowResize = null;
     this.windowBindings = new Map();
     this.dragContextId =
       globalThis.crypto?.randomUUID?.() ??
@@ -473,6 +553,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
 
   onunload() {
     this.handleNativeTabDragEnd();
+    this.cancelRowResize();
     for (const { doc } of this.windowBindings.values()) {
       this.detachBindings(doc);
       this.clearSettingsFromDocument(doc);
@@ -637,6 +718,29 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       "--multiline-tabs-scrollbar-width",
       `${this.settings.scrollbarWidth}px`,
     );
+    for (const handle of doc.querySelectorAll(
+      "[data-multiline-tabs-row-resize-handle='true']",
+    )) {
+      handle.setAttribute("aria-valuenow", String(this.settings.visibleRows));
+    }
+  }
+
+  applyVisibleRowsPreview(visibleRows) {
+    for (const { doc } of this.windowBindings.values()) {
+      if (!doc?.body) {
+        continue;
+      }
+
+      doc.body.style.setProperty(
+        "--multiline-tabs-visible-rows",
+        String(visibleRows),
+      );
+      for (const handle of doc.querySelectorAll(
+        "[data-multiline-tabs-row-resize-handle='true']",
+      )) {
+        handle.setAttribute("aria-valuenow", String(visibleRows));
+      }
+    }
   }
 
   clearSettingsFromDocument(doc) {
@@ -651,7 +755,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
   }
 
   queueRefresh() {
-    if (this.isDragSessionActive()) {
+    if (this.isDragSessionActive() || this.rowResize) {
       this.refreshAfterDrag = true;
       return;
     }
@@ -731,6 +835,9 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       return;
     }
 
+    if (this.rowResize?.window === win) {
+      this.cancelRowResize();
+    }
     this.detachBindings(binding.doc);
     win.removeEventListener("pointerdown", this.boundTabPointerDown, true);
     win.removeEventListener("pointerup", this.boundTabPointerUp, true);
@@ -744,6 +851,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     win.removeEventListener("resize", this.boundRefresh);
     binding.observer.disconnect();
     binding.dropIndicatorStyle.remove();
+    this.removeRowResizeHandles(binding.doc);
     this.windowBindings.delete(win);
   }
 
@@ -768,6 +876,19 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
 
   isDragSessionActive() {
     return Boolean(this.tabDrag || this.remoteDrag);
+  }
+
+  hasDeferredRefresh() {
+    return this.refreshAfterDrag && !this.isDragSessionActive() && !this.rowResize;
+  }
+
+  flushDeferredRefresh() {
+    if (!this.hasDeferredRefresh()) {
+      return;
+    }
+
+    this.refreshAfterDrag = false;
+    this.queueRefresh();
   }
 
   postDragMessage(message) {
@@ -855,10 +976,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     ) {
       this.remoteDrag = null;
       this.clearDropMarker();
-      if (!this.isDragSessionActive() && this.refreshAfterDrag) {
-        this.refreshAfterDrag = false;
-        this.queueRefresh();
-      }
+      this.flushDeferredRefresh();
     }
 
     if (
@@ -1021,6 +1139,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
 
         container.dataset.multilineTabsWheelScroll = "true";
         container.addEventListener("wheel", this.boundWheelHandler, { passive: false });
+        this.ensureRowResizeHandle(container.parentElement, doc);
 
         if (doc !== document) {
           continue;
@@ -1076,6 +1195,198 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
       button.style.removeProperty("webkit-app-region");
       delete button.dataset.multilineTabsSidebarBinding;
     }
+  }
+
+  removeRowResizeHandles(doc) {
+    for (const handle of doc?.querySelectorAll?.(
+      "[data-multiline-tabs-row-resize-handle='true']",
+    ) ?? []) {
+      if (!this.isElement(handle)) {
+        continue;
+      }
+
+      handle.removeEventListener("pointerdown", this.boundRowResizePointerDown);
+      handle.remove();
+    }
+  }
+
+  ensureRowResizeHandle(headerContainer, doc) {
+    if (!this.isElement(headerContainer)) {
+      return null;
+    }
+
+    const existing = headerContainer.querySelector(
+      ":scope > [data-multiline-tabs-row-resize-handle='true']",
+    );
+    if (this.isElement(existing)) {
+      existing.setAttribute("aria-valuenow", String(this.settings.visibleRows));
+      existing.addEventListener("pointerdown", this.boundRowResizePointerDown);
+      return existing;
+    }
+
+    const handle = doc.createElement("div");
+    handle.className = "multiline-tabs-row-resize-handle";
+    handle.dataset.multilineTabsRowResizeHandle = "true";
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", "horizontal");
+    handle.setAttribute("aria-valuemin", String(SETTINGS_LIMITS.visibleRows.min));
+    handle.setAttribute("aria-valuemax", String(SETTINGS_LIMITS.visibleRows.max));
+    handle.setAttribute("aria-valuenow", String(this.settings.visibleRows));
+    handle.setAttribute("aria-label", "Resize visible tab rows");
+    handle.title = "Drag to change visible tab rows";
+    handle.setAttribute("draggable", "false");
+    handle.textContent = "";
+    handle.addEventListener("pointerdown", this.boundRowResizePointerDown);
+    headerContainer.appendChild(handle);
+    return handle;
+  }
+
+  handleRowResizePointerDown(event) {
+    if (event.button !== 0 || event.isPrimary === false || this.rowResize) {
+      return;
+    }
+
+    const handle = event.currentTarget;
+    if (!this.isElement(handle)) {
+      return;
+    }
+
+    const resizeWindow = handle.ownerDocument?.defaultView;
+    if (!resizeWindow) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    this.rowResize = {
+      document: handle.ownerDocument,
+      handle,
+      window: resizeWindow,
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startRows: this.settings.visibleRows,
+      currentRows: this.settings.visibleRows,
+    };
+    handle.classList.add("is-dragging");
+    handle.setPointerCapture?.(event.pointerId);
+    resizeWindow.addEventListener("pointermove", this.boundRowResizePointerMove, true);
+    resizeWindow.addEventListener("pointerup", this.boundRowResizePointerUp, true);
+    resizeWindow.addEventListener(
+      "pointercancel",
+      this.boundRowResizePointerCancel,
+      true,
+    );
+  }
+
+  handleRowResizePointerMove(event) {
+    const state = this.rowResize;
+    if (!state || event.pointerId !== state.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const rowStep = Math.max(1, this.settings.rowHeight + this.settings.rowGap);
+    const rowDelta = Math.round((event.clientY - state.startY) / rowStep);
+    const nextRows = Math.min(
+      SETTINGS_LIMITS.visibleRows.max,
+      Math.max(SETTINGS_LIMITS.visibleRows.min, state.startRows + rowDelta),
+    );
+    if (nextRows === state.currentRows) {
+      return;
+    }
+
+    state.currentRows = nextRows;
+    this.applyVisibleRowsPreview(nextRows);
+  }
+
+  async handleRowResizePointerUp(event) {
+    const state = this.rowResize;
+    if (!state || event.pointerId !== state.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    this.finishRowResize(state.currentRows);
+  }
+
+  handleRowResizePointerCancel(event) {
+    const state = this.rowResize;
+    if (!state || event.pointerId !== state.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    this.cancelRowResize();
+  }
+
+  releaseRowResizePointerCapture(state) {
+    try {
+      state.handle.releasePointerCapture?.(state.pointerId);
+    } catch {
+      // The handle may already be disconnected when its window closes.
+    }
+  }
+
+  finishRowResize(rows) {
+    const state = this.rowResize;
+    if (!state) {
+      return;
+    }
+
+    state.window.removeEventListener("pointermove", this.boundRowResizePointerMove, true);
+    state.window.removeEventListener("pointerup", this.boundRowResizePointerUp, true);
+    state.window.removeEventListener(
+      "pointercancel",
+      this.boundRowResizePointerCancel,
+      true,
+    );
+    this.releaseRowResizePointerCapture(state);
+    state.handle.classList.remove("is-dragging");
+    this.rowResize = null;
+
+    const nextRows = this.clampSetting(
+      rows,
+      SETTINGS_LIMITS.visibleRows,
+      this.settings.visibleRows,
+    );
+    if (nextRows === this.settings.visibleRows) {
+      this.applySettingsToAllDocuments();
+      this.flushDeferredRefresh();
+      return;
+    }
+
+    void this.updateSettings({ visibleRows: nextRows }).catch((error) => {
+      console.error("Failed to save visible tab rows", error);
+      this.applySettingsToAllDocuments();
+    });
+    this.flushDeferredRefresh();
+  }
+
+  cancelRowResize() {
+    const state = this.rowResize;
+    if (!state) {
+      return;
+    }
+
+    state.window.removeEventListener("pointermove", this.boundRowResizePointerMove, true);
+    state.window.removeEventListener("pointerup", this.boundRowResizePointerUp, true);
+    state.window.removeEventListener(
+      "pointercancel",
+      this.boundRowResizePointerCancel,
+      true,
+    );
+    this.releaseRowResizePointerCapture(state);
+    state.handle.classList.remove("is-dragging");
+    this.rowResize = null;
+    this.applySettingsToAllDocuments();
+    this.flushDeferredRefresh();
   }
 
   detachTabDragHandlers() {
@@ -1595,10 +1906,7 @@ module.exports = class MultilineTabsWheelScrollPlugin extends Plugin {
     this.clearDropMarker();
     this.tabDrag = null;
     this.remoteDrag = null;
-    if (this.refreshAfterDrag) {
-      this.refreshAfterDrag = false;
-      this.queueRefresh();
-    }
+    this.flushDeferredRefresh();
   }
 
   stopWheelAnimations() {
