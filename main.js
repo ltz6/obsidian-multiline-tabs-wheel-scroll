@@ -268,21 +268,6 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::after,
-body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle::after {
-  content: "↕";
-  position: relative;
-  z-index: 1;
-  display: block;
-  min-width: 24px;
-  padding: 0 4px;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 8px;
-  text-align: center;
-  background: var(--background-primary);
-}
-
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover,
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover,
@@ -297,14 +282,6 @@ body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container 
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::before {
   border-top-color: var(--interactive-accent);
 }
-
-.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::after,
-.workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::after,
-body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle:hover::after,
-body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .multiline-tabs-row-resize-handle.is-dragging::after {
-  color: var(--text-normal);
-}
-
 .workspace-split.mod-root > .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar,
 body.is-popout-window .workspace-tabs.mod-top > .workspace-tab-header-container > .workspace-tab-header-container-inner::-webkit-scrollbar {
   width: var(--multiline-tabs-scrollbar-width);
